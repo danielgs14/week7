@@ -1,0 +1,102 @@
+---
+title: "Data Visualization Activity 2"
+author: "Dr. Luis Malpica"
+date: "March, 2020"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    theme: united
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction
+
+Now it is your turn to make a publication quality figure, your goal is to polish a plot for publication. 
+
+Get the two plots below ready for publication, ideally in the same multipanel plot, remember:
+
+- Check: Axes, data density, theme, overplotting, etc.
+- Output publication quality
+- Make a figure caption
+
+# Install required packages
+```{r, message=FALSE}
+# If you don't yet have tidyverse run:
+# install.packages("tidyverse")
+library(tidyverse)
+
+# We will require this package to handle some dates in this dataset
+# install.packages("lubridate")
+library(lubridate)
+
+# We will use this package to load premade ggplot themes (more below)
+# install.packages("ggthemes")
+library(ggthemes)
+
+# We will use this one to do multipanel plots 
+# install.packages("gridExtra")
+library(gridExtra)
+
+```
+
+# Load, check & clean data
+```{r}
+perch <- read.csv("data/YPerchTL.csv")
+
+# To make things faster just run these lines:
+perch$sampledate <- mdy(perch$sampledate)
+
+perch <- perch %>%
+  select(-lakeid) %>%
+  select(-spname) %>% 
+  select(-year4) %>% 
+  mutate(year = year(sampledate))
+
+# We just assigned as data 'sampledate' and removed unnecessary columns
+# STEP 1, did it load correctly?
+head(perch)
+
+# STEP 2: Are the data types right?
+sapply(perch, class)
+
+# STEP 3: Check for missing or impossible values
+range(perch$sampledate)
+
+range(perch$year)
+
+range(perch$length)
+plot(perch$length)
+hist(perch$length)
+
+range(perch$weight)
+# here there are tons of NAs that make this function's output not make much sense
+range(perch$weight, na.rm = T) # Solve using 'na.rm'
+plot(perch$weight)
+hist(perch$weight)
+
+# STEP 4: Factor levels
+levels(perch$gearid)
+
+# Seems allright
+```
+
+# PLOT 1 with ggplot
+```{r}
+# This plot should present the weight over time, perhaps sample date such as this one:
+a <- ggplot(perch, aes(x=sampledate, y=weight)) + 
+  geom_point()
+
+```
+
+# PLOT 2 with ggplot
+```{r}
+# This plot should present the weight by gear type, such as this one:
+a <- ggplot(perch, aes(x=gearid, y=weight)) +
+  geom_boxplot()
+
+```
+
+

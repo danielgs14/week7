@@ -1,0 +1,29 @@
+Dr. Luis Malpica Cruz
+EDA-R course
+March 2020
+
+Week 7: Displaying Data Visually 2
+
+Background:
+In week 7 of EDA-R we get into getting data display ready for publication.
+
+We focus on axes, themes, data density, and outputting at publication quality.
+
+We use some dataset again from Derek Ogle's website: http://derekogle.com/fishR/data/data-html/YPerchTL.html 
+
+
+Week7_Data_Vis2
+|
+|- Week7_Data_Vis2.Rproj 	# The project file
+|
+|- Description.txt 	    # You're reading it.
+|
+|- data/                
+|  +- YPerchTL.csv # Yellow perch dataset from Ogle
+|
+|- analysis/            
+|  +- 001_vis_data_2.Rmd     # Contains all code to make the plots from class
+|  +- 002_vis_data_act_2.Rmd # Code to get you started for the in-class assignment, which is 
+|			     # to create a publication-quality figure
+|
+|- plots/ 	# Contains four publication-quality figures, which are output from the code

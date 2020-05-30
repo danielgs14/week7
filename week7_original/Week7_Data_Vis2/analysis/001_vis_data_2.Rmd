@@ -1,0 +1,679 @@
+---
+title: "Data Visualization 2"
+author: "Dr. Luis Malpica"
+date: "March, 2020"
+output:
+  html_document:
+    theme: united
+    toc: yes
+  pdf_document:
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+# Introduction
+Here we will explore how to create publication-quality figures in R. To acknowledge my forebears, part of these materials comes from Brett Favaro's R course as well as from a "Wrangling Your Data in R" course taught by Drs. Sean Anderson, Franz Simon, and Alex Chubaty, and latter compiled for a "Visualization in R" workshop by Dra. Natascia Tamburello.
+
+And always remember...
+
+"Make 100 figures for every 1 you publish" -Marc Mangel
+
+This time we will work with different types of data, first, we'll simulate some data to play with and explore how to customize the basic scatter plot. Then we will be loading a perch dataset should be loaded into memory. This dataset is comprised of 7328 obs of 5 vars
+
+Data are from: http://derekogle.com/fishR/data/data-html/YPerchTL.html
+obtained 23 Oct 2019
+
+Data variables of perch dataset:
+ sampledate: Date of capture
+ gearid: Capture gear type – beach seine (BSEINE), crayfish trap (CRAYTR), electrofishing (ELFISH), fyke net (FYKNET), trammel net (TRAMML), vertical gillnets of different mesh sizes (VBN0XX), and different types of fyke nets (FYKNED and FYKNEL)
+ length: Total Length (nearest mm) at capture
+ weight: Weight (nearest 0.1 or 1 g) at capture
+
+# Install required packages
+```{r, message=FALSE}
+# If you don't yet have tidyverse run:
+# install.packages("tidyverse")
+library(tidyverse)
+
+# We will require this package to handle some dates in this dataset
+# install.packages("lubridate")
+library(lubridate)
+
+# We will use this package to load premade ggplot themes (more below)
+# install.packages("ggthemes")
+library(ggthemes)
+
+# We will use this one to do multipanel plots 
+# install.packages("gridExtra")
+library(gridExtra)
+
+#This one is to explore some extra color options
+# install.packages("RColorBrewer")
+library(RColorBrewer)
+
+#Lastly to add labels to subfigures
+# install.packages("egg")
+library(egg)
+```
+
+# Additional capabilities in Base plot:
+```{r}
+# First, we'll simulate some data to play with
+
+x <- seq(0, 20, by=0.1)
+y1 <- rnorm(length(x), mean = x, sd = 3)
+y2 <- rnorm(length(x), mean = x+12, sd = 3)
+y3 <- 20 - y1
+d <- data.frame(x, y1)
+fit.y1 <- lm(y1~x, data = d)
+
+plot(x, y1)
+points(x, y2) #overlays points onto existing plot
+abline (fit.y1) #Draws a line based on intercept/slope of a model fitted to the data
+abline (v=5) #Draws a straight lines to mark mean or other "landmark", h = (horiz), v = (vert)
+segments(5, 10, 15, 15) #for adding line segments by start and end point (x0, y0, x1, y1,)
+lines(x, y1) #connects all the dots with straight lines, e.g., to visualize fluctuations in time series data
+
+```
+
+# Load, check & clean data
+```{r}
+perch <- read.csv("/Volumes/GoogleDrive/My Drive/IIO-UABC/Cursos/FCM/Analisis_R/Posgrado/wk7/Week7_Data_Vis2/data/YPerchTL.csv")
+
+# To make things faster just run these lines:
+perch$sampledate <- mdy(perch$sampledate)
+
+perch <- perch %>%
+  select(-lakeid) %>%
+  select(-spname) %>% 
+  select(-year4) %>% 
+  mutate(year = year(sampledate))
+
+# We just assigned as data 'sampledate' and removed unnecessary columns
+# STEP 1, did it load correctly?
+head(perch)
+
+# STEP 2: Are the data types right?
+sapply(perch, class)
+
+# STEP 3: Check for missing or impossible values
+range(perch$sampledate)
+
+range(perch$year)
+
+range(perch$length)
+plot(perch$length)
+hist(perch$length)
+
+range(perch$weight)
+# here there are tons of NAs that make this function's output not make much sense
+range(perch$weight, na.rm = T) # Solve using 'na.rm'
+plot(perch$weight)
+hist(perch$weight)
+
+# STEP 4: Factor levels
+levels(perch$gearid)
+
+# Seems allright
+```
+
+# Continuous X vs Continuous Y in Base plot
+```{r}
+plot(weight ~ length, data=perch)
+
+# 1. Fix labels
+
+plot(weight ~ length, data=perch,
+     xlab = "Length (mm)",
+     ylab = "Weight (g)")
+
+# 2. Data density 
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (mm)",
+     ylab = "Weight (g)") #oops, now X axis is wrong!
+
+# One solution
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)")
+ 
+# Another solution: make a manually specified X axis
+# But don't do this...just use ggplot
+
+# Problem: blank space
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",
+     xlim=c(1.4,2.5))
+
+# 3. There are no easy way to change the theme in base
+# But you can do stuff like add grid lines
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",
+     xlim=c(1.4,2.5))
+
+grid(lty = 1) #sloppy.
+
+# Solution: Draw a blank graph
+# then add the grid
+# THEN draw the points
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",
+     xlim=c(1.4,2.5),
+     pch="") # Makes the plot blank
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch)
+
+
+# Show how you can make a blank plot then add a grid then add points
+
+# 4. Overplotting not a problem (default character is open circle)
+# But here's how to specify characters:
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",
+     xlim=c(1.4,2.5),
+     pch=8) # pch specifies character types
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch)
+
+# 5. Final polish - expand axis labels sizes
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",xlim=c(1.4,2.5),
+     pch="",
+     cex.axis=1.4,
+     cex.lab=1.6) 
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch)
+
+# You can also add colors!
+
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",xlim=c(1.4,2.5),
+     pch="",
+     cex.axis=1.4,
+     cex.lab=1.6) 
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch, 
+       col = "red") # col changes the fill color of points
+
+# Or combine different colors
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",xlim=c(1.4,2.5),
+     pch="",
+     cex.axis=1.4,
+     cex.lab=1.6) 
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch, 
+       col = "red", bg = "blue", pch = 24) # bg changes the fill color
+
+
+# 6. Export
+
+# START by defining the file name and its parameters
+#tiff(filename = "./plots/Figure1_base.tiff",
+#     width = 15, height = 10, units = "cm", 
+#     res = 300,
+#     compression ="lzw")
+
+# Everything to do with the plot comes next
+plot(log10(weight) ~ log10(length), data=perch,
+     xlab = "Length (log mm)",
+     ylab = "Weight (log g)",xlim=c(1.4,2.5),
+     pch="",
+     cex.axis=1.4,
+     cex.lab=1.6) 
+
+grid(lty = 1) 
+points(log10(weight) ~ log10(length), data=perch)
+
+# THEN close it off with dev.off()
+
+#dev.off() # This is as comment to knit Rmd as html/pdf
+
+```
+
+# Continuous X vs Continuous Y in ggplot
+```{r}
+a <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point() 
+
+a
+
+# What makes this not publication quality? 
+# 1. Fix labels
+
+a + labs(x = "Length (mm)", y = "Weight (g)")
+
+# Maybe a bit too small still - get to that later
+a <- a + labs(x = "Length (mm)", y = "Weight (g)") # lock in this new plot
+
+# 2. Supose you want to equalize data density
+
+a + scale_y_log10() # not good enough
+
+a + scale_y_log10() + scale_x_log10() # great!
+
+# Note about logs:
+log(10) # R uses natural log by default
+log10(10) # log10 uses... log10
+
+# 2A) Fix the x scale
+# Plotting in log space has left blank space on our plot
+# Let's fix it!
+
+a + scale_y_log10() + scale_x_log10(limits = c(25, 300)) 
+
+# Better data density, but now we need more ticks!
+
+a + scale_y_log10() +
+ scale_x_log10(limits = c(25, 300),
+                breaks= seq(from=25, to=300, by=75)) 
+
+# Better
+
+a <- a + scale_y_log10() +
+  scale_x_log10(limits = c(25, 300),
+                breaks= seq(from=25, to=300, by=75)) 
+
+# 3) Change the background aesthetic
+
+# If you want to get crazy there are a whole bunch more themes in the package `ggthemes`
+# Within the theme function you can do all sorts of customization
+
+a + theme_bw()
+
+a + theme_dark()
+a + theme_classic()
+a + theme_linedraw()
+a + theme_minimal()
+
+# For fun:
+
+# https://jrnold.github.io/ggthemes/
+
+a + theme_tufte()
+a + theme_base()
+
+a + theme_economist()
+a + theme_wsj()
+a + theme_fivethirtyeight()
+
+a + theme_excel()
+
+# 4) Deal with overplotting (i.e. too many data points overlapping)
+
+# Since we're doing a different geom_point we have to remake the whole plot
+a <- ggplot(data = perch, aes(x = length, y = weight)) +
+  geom_point(shape=1) + #Use an open circled
+  scale_y_log10() +
+  scale_x_log10(limits = c(25, 300),
+                breaks= seq(from=25, to=300, by=75)) +
+  labs(x = "Length (mm)", y = "Weight (g)") +
+  theme_bw()
+
+a
+
+#5. Final polish
+
+# Axes labels could be a bit bigger
+
+a + theme(axis.text = element_text(size=16),
+        axis.title = element_text(size=18))
+  
+# Check ?theme() for more option
+
+# Recap to this point:
+
+# Code to make figure - 
+
+a <- ggplot(data = perch, aes(x = length, y = weight)) +
+  geom_point(shape=1) + #Use an open circled
+  scale_y_log10() +
+  scale_x_log10(limits = c(25, 300),
+                breaks= seq(from=25, to=300, by=75)) +
+  labs(x = "Length (mm)", y = "Weight (g)") +
+  theme(axis.text = element_text(size=16),
+        axis.title = element_text(size=18)) +
+  theme_bw() 
+
+a
+
+#6. Output publication-quality
+
+#ggsave("./plots/Figure1_ggplot.tiff", # save in the /plots subfolder
+#       dpi=300, #300 DPI
+#       width = 15, height = 10, #15 wide, 10 high
+#       device = "tiff", #export as tiff
+#       compression = "lzw",
+#       units = "cm") # Units are cm
+
+```
+
+# Discrete X, Continuous Y in ggplot
+```{r}
+b <- ggplot(data = perch, aes(x = gearid, y=length))
+
+b + geom_boxplot()
+
+# First, let's lock in some aesthetic fixes
+
+b <- ggplot(data = perch, aes(x = gearid, y=length)) +
+  labs(x = "Gear ID", y = "Length (mm)") + 
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=14)) +
+  theme_bw() 
+  
+ 
+b + geom_boxplot() +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+# To simplyify plot, combine categories using 'case_when()'
+
+levels(perch$gearid)
+
+perch <- perch %>%
+  mutate(combinedgear = as.factor(
+    case_when(
+    gearid == "FYKNED" ~ "FYK",
+    gearid == "FYKNEL" ~ "FYK",
+    gearid == "FYKNET" ~ "FYK",
+    gearid == "VGN019" ~ "VGN",
+    gearid == "VGN025" ~ "VGN",
+    gearid == "VGN032" ~ "VGN",
+    gearid == "VGN038" ~ "VGN",
+    gearid == "VGN089" ~ "VGN",
+    gearid == "BSEINE" ~ "BSEINE",
+    gearid == "CRAYTR" ~ "CRAYTR",
+    gearid == "ELFISH" ~ "ELFISH",
+    gearid == "MINNOW" ~ "MINNOW",
+    gearid == "TRAMML" ~ "TRAMML",
+    TRUE ~ "missing")
+  )) 
+
+levels(perch$combinedgear)
+
+c <- ggplot(data = perch, aes(x = combinedgear, y=length)) +
+  geom_boxplot() +
+  labs(x = "Gear ID", y = "Length (mm)") + 
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=14)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+c
+
+# 3. Let´s explore what else you can do with plotting in R
+# For example, let´s reorder factors to make plot easier to read
+
+# Use the forcats package, embedded in tidyverse
+
+# Option 1; Go smallest to largest
+
+c <- ggplot(data = perch, aes(x = fct_reorder(combinedgear, length),
+                              y=length)) +
+  geom_boxplot() +
+  labs(x = "Gear ID", y = "Length (mm)") + 
+  theme(axis.text = element_text(size=12),
+        axis.title = element_text(size=14)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+c
+
+# Option 2: Smallest to largest, but with a control group on left
+
+# Let's say "ELFISH" was our "control" group
+
+c <- ggplot(data = perch, aes(x =
+                                fct_relevel(
+                                  fct_reorder(combinedgear, length),
+                                 "ELFISH"),
+                              y=length)) +
+  geom_boxplot() +
+  labs(x = "Gear ID", y = "Length (mm)") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90, hjust=1)) 
+
+c
+
+# Expand the axes
+c + theme(axis.text = element_text(size=12),
+          axis.title = element_text(size=14)) 
+
+# Let's add original data on plot (need to remake the full plot so we can get layering right)
+
+c <- ggplot(data = perch, aes(x =
+                                fct_relevel(
+                                  fct_reorder(combinedgear, length),
+                                  "ELFISH"),
+                              
+                              y=length)) +
+  geom_jitter(colour="grey", alpha=0.5) +
+  geom_boxplot(alpha=0.8) +
+  labs(x = "Gear ID", y = "Length (mm)") + 
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=90, hjust=1),
+        axis.text = element_text(size=12),
+        axis.title = element_text(size=14)
+  )
+
+c
+
+# Save figure as high quality output 
+#ggsave("./plots/Figure2.tiff", # save in the /plots subfolder
+#       dpi=300, #300 DPI
+#       width = 15, height = 10, #15 wide, 10 high
+#       device = "tiff", #export as tiff
+#       compression = "lzw",
+#       units = "cm") # Units are cm
+
+```
+
+# ggplot "extensions" =)
+```{r}
+# Great but, are there other capabilities in ggplot?
+# We can specify to color the points by a continuous variable to generate a gradient
+# I will use the simple plot version for these examples:
+
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+  theme_bw()
+d
+
+# ------------------------------------------------------------------------------
+# A note here on colors on ggplot, 
+# Besides cutomization you can do in ggplot, there are a bunch of color options to explore
+# In particular there is a package that helps you assign way more colors than what ggplot offers:
+# https://cran.r-project.org/web/packages/RColorBrewer/index.html
+
+# Let's just quickly check these out
+par(mar=c(3,4,2,2))
+display.brewer.all()
+
+# Also, ggplot has a nice color scale palette which is supposedly the best to better
+# read your data, colorblind friendly and prints great on greyscale if needed when using
+# sequencial colors, like for a gradient
+# They are called the 'viridis' color palettes 
+# https://ggplot2.tidyverse.org/reference/scale_viridis.html
+
+# There are these color options ("magma" (or "A"), "inferno" (or "B"), 
+# "plasma" (or "C"), "viridis" (or "D", the default option) and "cividis" (or "E").)
+# You can use it like this:
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+#  scale_fill_viridis_() +
+  scale_color_viridis_c(option = "A") +
+  theme_bw()
+d
+
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+#  scale_fill_viridis_() +
+  scale_color_viridis_c(option = "B") +
+  theme_bw()
+d
+
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+#  scale_fill_viridis_() +
+  scale_color_viridis_c(option = "C") +
+  theme_bw()
+d
+
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+#  scale_fill_viridis_() +
+  scale_color_viridis_c(option = "D") +
+  theme_bw()
+d
+
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = weight)) +
+#  scale_fill_viridis_() +
+  scale_color_viridis_c(option = "E") +
+  theme_bw()
+d
+
+# ------------------------------------------------------------------------------
+# Going back to changing aesthetics
+# same with size
+d <- ggplot(data = perch, aes(x = length, y = weight, size = weight)) +
+geom_point(alpha = 0.5, aes(size = weight)) +
+  theme_bw()
+d
+
+# or both combined
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(size = weight, color = weight)) +
+  theme_bw()
+d
+
+# or using the discrete variable combinedgear to assign shapes
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(size = weight, shape = combinedgear)) +
+  theme_bw()
+d
+
+# or using the discrete variable combinedgear to color code
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = combinedgear)) +
+  theme_bw()
+d
+
+# maybe using the viridis palette
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = combinedgear)) +
+  scale_color_viridis_d() +
+  theme_bw()
+d
+
+# May also help to add labels to the gear used
+d <- ggplot(data = perch, aes(x = length, y = weight)) +
+ geom_point(alpha = 0.5, aes(color = combinedgear)) +
+  scale_color_viridis_d(name= "Gear type",
+                      labels=c("Beach seine", 
+                               "Crayfish trap", 
+                               "Electrofishing", 
+                               "FykeFyke net", 
+                               "Minnow trap", 
+                               "Trammel net", 
+                               "Vertical gillnet")) +
+  theme_bw()
+d
+
+# These are just examples to present you ggplot capabilites, they are not 
+# necessarily the ideal plots for the data, remember each plot must be easy 
+# to understand and tell a clear story
+
+```
+
+# Multi-panel plots: 'facet_wrap', 'facet_grid' and 'grid.arrange()'
+```{r}
+# Use `facet_wrap` and `facet_grid` to group "similar" data  across multiple plots 
+# Let's replace one of the aesthetics with a facet_wrap
+e <- ggplot(data = perch, aes(x = length, y = weight, color = weight, size = weight)) +
+ geom_point(alpha = 0.5, aes(size = weight, color = weight)) +
+facet_wrap(~combinedgear)
+e
+
+# For publication you may need to assign a label to each panel as they are considered subfigures
+# So you may need to strip the label and use the (a), (b), etc.
+# The 'egg' package does the trick here
+tag_facet(e)
+
+# Explore further options on this aspect here:
+# https://rdrr.io/cran/egg/f/vignettes/Overview.Rmd
+
+# Now let's replace one of the aesthetics with a facet_grid
+# facet_grid breaks out graphs for every combination of gear and year caught
+# Careful, this one will take some time for your machine to compile
+e <- ggplot(data = perch, aes(x = length, y = weight, color = weight, size = weight)) +
+ geom_point(alpha = 0.5, aes(size = weight, color = weight)) +
+facet_grid(year~combinedgear)
+#e
+
+# Use grid.arrange() to group different types of plots with different types of data
+# Let's recall our final polished plots from previous examples:
+a
+c
+grid.arrange(a, c, nrow =2, ncol=1)
+
+# Now like we did before if these will be a single figure, labeling each subfigure may be needed
+# however the 'egg' package does not work here
+# The following manual work around works great but not for facets like the above
+a + annotate("text", x = 25, y = 250,
+             label = "A", size = 6)
+c + annotate("text", x = .55, y = 280,
+             label = "B", size = 5)
+
+# To add them to the 'grid.arrange' we need to save these changes into the ggplot objects
+a <- a + annotate("text", x = 25, y = 250,
+             label = "A", size = 6)
+c <- c + annotate("text", x = .55, y = 280,
+             label = "B", size = 5)
+grid.arrange(a, c, nrow =2, ncol=1)
+
+```
+
+# More exporting options: 'ggsave'
+```{r}
+# ggsave also allows you to save in other formats besides TIFFs
+
+# PDFs are also used for publications or further editing in Adobe Illustrator
+# I also like this format because quality is high and is a super compressed file (small size)
+
+# For multipanel plots like the last one, you first need a step before
+g <- arrangeGrob(a, c, nrow =2, ncol=1)
+# This generates a g object that stores the plots like the grid.arrange above
+
+# The next lines save this g object as a pdf file
+#ggsave("./plots/Figure3.pdf", g, # save in the /plots subfolder
+#       dpi=300, #300 DPI this is generally the minimum quality required for publication
+#       width = 16, height = 18, #16 wide, 14 high
+#       device = "pdf", #export as pdf
+#       units = "cm", # Units are cm
+#       useDingbats=FALSE) # stops the PDF replacing vector shapes with odd characters
+# When saving to pdf there is no need for a compression like we did for TIFF
+
+# check ?ggsave for more saving formats
+
+```
+
+
